@@ -524,29 +524,35 @@ struct KeyboardShortcutsSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                SettingsSection("终端导航") {
-                    ForEach(Array(TerminalShortcutAction.allCases.enumerated()), id: \.element) { index, action in
-                        SettingsControlRow(LocalizedStringKey(action.title)) {
-                            TerminalShortcutRecorder(binding: shortcuts.binding(for: action)) { binding in
-                                if let conflict = shortcuts.setBinding(binding, for: action) {
-                                    conflictMessage = String(
-                                        format: NSLocalizedString("%@ 已分配给 %@。", comment: "Shortcut conflict"),
-                                        binding.displayName,
-                                        NSLocalizedString(conflict.title, comment: "Terminal shortcut action")
-                                    )
+                ForEach(TerminalShortcutCategory.allCases) { category in
+                    let actions = TerminalShortcutAction.allCases.filter { $0.category == category }
+                    if !actions.isEmpty {
+                        SettingsSection(LocalizedStringKey(category.rawValue)) {
+                            ForEach(Array(actions.enumerated()), id: \.element) { index, action in
+                                SettingsControlRow(LocalizedStringKey(action.title)) {
+                                    TerminalShortcutRecorder(binding: shortcuts.binding(for: action)) { binding in
+                                        if let conflict = shortcuts.setBinding(binding, for: action) {
+                                            conflictMessage = String(
+                                                format: NSLocalizedString("%@ 已分配给 %@。", comment: "Shortcut conflict"),
+                                                binding.displayName,
+                                                NSLocalizedString(conflict.title, comment: "Terminal shortcut action")
+                                            )
+                                        }
+                                    }
+                                    .frame(width: 110, height: 24)
+                                }
+                                if index < actions.count - 1 {
+                                    SettingsDivider()
                                 }
                             }
-                            .frame(width: 96, height: 24)
-                        }
-                        if index < TerminalShortcutAction.allCases.count - 1 {
-                            SettingsDivider()
                         }
                     }
-                } footer: {
-                    Text("点击快捷键，然后按下包含 Command 的组合键。这些快捷键仅在终端获得焦点时有效。")
                 }
 
                 HStack {
+                    Text("提示：点击任意快捷键按钮即可录制自定义组合键，按 Esc 取消。这些快捷键在终端获得焦点时有效。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     Spacer()
                     Button("恢复默认快捷键") {
                         shortcuts.restoreDefaults()

@@ -2,39 +2,98 @@ import AppKit
 import Foundation
 import SwiftUI
 
+/// Categories for grouping terminal shortcuts in Settings
+enum TerminalShortcutCategory: String, CaseIterable, Identifiable {
+    case navigation = "光标与导航"
+    case editing = "命令行编辑"
+    case screen = "屏幕与排版"
+    case tabAndSplit = "标签页与分屏"
+    case clipboard = "剪贴板与选择"
+
+    var id: String { rawValue }
+}
+
 /// Terminal navigation actions that can be assigned to application-level shortcuts.
 /// Custom bindings are evaluated only while the terminal view is the active responder.
 enum TerminalShortcutAction: String, CaseIterable, Identifiable {
+    // 光标与导航
     case beginningOfLine
     case endOfLine
+    case wordLeft
+    case wordRight
     case pageUp
     case pageDown
     case scrollToTop
     case scrollToBottom
+
+    // 命令行编辑
+    case deleteToBeginningOfLine
+    case deleteWordBackward
+    case clearScreen
+
+    // 屏幕与排版
+    case increaseFontSize
+    case decreaseFontSize
+    case resetFontSize
+
+    // 标签页与分屏
     case newTab
     case splitRight
     case splitDown
     case closePane
 
+    // 剪贴板与选择
+    case copy
+    case paste
+    case selectAll
+    case find
+
     var id: String { rawValue }
+
+    var category: TerminalShortcutCategory {
+        switch self {
+        case .beginningOfLine, .endOfLine, .wordLeft, .wordRight, .pageUp, .pageDown, .scrollToTop, .scrollToBottom:
+            return .navigation
+        case .deleteToBeginningOfLine, .deleteWordBackward, .clearScreen:
+            return .editing
+        case .increaseFontSize, .decreaseFontSize, .resetFontSize:
+            return .screen
+        case .newTab, .splitRight, .splitDown, .closePane:
+            return .tabAndSplit
+        case .copy, .paste, .selectAll, .find:
+            return .clipboard
+        }
+    }
 
     var title: String {
         switch self {
-        case .beginningOfLine: return "行首"
-        case .endOfLine: return "行尾"
-        case .pageUp: return "向上翻页"
-        case .pageDown: return "向下翻页"
-        case .scrollToTop: return "滚动到顶部"
-        case .scrollToBottom: return "滚动到底部"
+        case .beginningOfLine: return "跳转至行首"
+        case .endOfLine: return "跳转至行尾"
+        case .wordLeft: return "向前跳跃一个单词"
+        case .wordRight: return "向后跳跃一个单词"
+        case .pageUp: return "向上翻一页"
+        case .pageDown: return "向下翻一页"
+        case .scrollToTop: return "滚动到最顶部（页首）"
+        case .scrollToBottom: return "滚动到最底部（页尾）"
+        case .deleteToBeginningOfLine: return "删除至行首 / 清空行"
+        case .deleteWordBackward: return "向左删除一个单词"
+        case .clearScreen: return "清屏"
+        case .increaseFontSize: return "放大终端字号"
+        case .decreaseFontSize: return "缩小终端字号"
+        case .resetFontSize: return "重置终端字号"
         case .newTab: return "新建标签页并复制会话"
         case .splitRight: return "向右分屏并复制会话"
         case .splitDown: return "向下分屏并复制会话"
         case .closePane: return "关闭当前分屏或标签页"
+        case .copy: return "复制选中内容"
+        case .paste: return "粘贴剪贴板"
+        case .selectAll: return "全选终端内容"
+        case .find: return "在终端中查找"
         }
     }
 
     fileprivate var storageKey: String {
-        "terminalShortcut.\(rawValue)"
+        "terminalShortcut.v4.\(rawValue)"
     }
 
     fileprivate var defaultBinding: TerminalKeyBinding {
@@ -43,14 +102,30 @@ enum TerminalShortcutAction: String, CaseIterable, Identifiable {
             return TerminalKeyBinding(keyCode: 123, modifiers: [.command]) // ⌘←
         case .endOfLine:
             return TerminalKeyBinding(keyCode: 124, modifiers: [.command]) // ⌘→
+        case .wordLeft:
+            return TerminalKeyBinding(keyCode: 123, modifiers: [.option]) // ⌥←
+        case .wordRight:
+            return TerminalKeyBinding(keyCode: 124, modifiers: [.option]) // ⌥→
         case .pageUp:
-            return TerminalKeyBinding(keyCode: 116, modifiers: [.command]) // ⌘⇞
+            return TerminalKeyBinding(keyCode: 116, modifiers: [.function]) // fn ↑ (Page Up)
         case .pageDown:
-            return TerminalKeyBinding(keyCode: 121, modifiers: [.command]) // ⌘⇟
+            return TerminalKeyBinding(keyCode: 121, modifiers: [.function]) // fn ↓ (Page Down)
         case .scrollToTop:
             return TerminalKeyBinding(keyCode: 126, modifiers: [.command]) // ⌘↑
         case .scrollToBottom:
             return TerminalKeyBinding(keyCode: 125, modifiers: [.command]) // ⌘↓
+        case .deleteToBeginningOfLine:
+            return TerminalKeyBinding(keyCode: 51, modifiers: [.command]) // ⌘⌫
+        case .deleteWordBackward:
+            return TerminalKeyBinding(keyCode: 51, modifiers: [.option]) // ⌥⌫
+        case .clearScreen:
+            return TerminalKeyBinding(keyCode: 40, modifiers: [.command]) // ⌘K
+        case .increaseFontSize:
+            return TerminalKeyBinding(keyCode: 24, modifiers: [.command]) // ⌘+
+        case .decreaseFontSize:
+            return TerminalKeyBinding(keyCode: 27, modifiers: [.command]) // ⌘-
+        case .resetFontSize:
+            return TerminalKeyBinding(keyCode: 29, modifiers: [.command]) // ⌘0
         case .newTab:
             return TerminalKeyBinding(keyCode: 17, modifiers: [.command]) // ⌘T
         case .splitRight:
@@ -59,6 +134,14 @@ enum TerminalShortcutAction: String, CaseIterable, Identifiable {
             return TerminalKeyBinding(keyCode: 2, modifiers: [.command, .shift]) // ⌘⇧D
         case .closePane:
             return TerminalKeyBinding(keyCode: 13, modifiers: [.command]) // ⌘W
+        case .copy:
+            return TerminalKeyBinding(keyCode: 8, modifiers: [.command]) // ⌘C
+        case .paste:
+            return TerminalKeyBinding(keyCode: 9, modifiers: [.command]) // ⌘V
+        case .selectAll:
+            return TerminalKeyBinding(keyCode: 0, modifiers: [.command]) // ⌘A
+        case .find:
+            return TerminalKeyBinding(keyCode: 3, modifiers: [.command]) // ⌘F
         }
     }
 }
@@ -92,10 +175,10 @@ struct TerminalKeyBinding: Hashable {
 
     static func capture(from event: NSEvent) -> TerminalKeyBinding? {
         let modifiers = normalizedModifiers(event.modifierFlags)
-        // `performKeyEquivalent` is the AppKit entry point that remains open
-        // on SwiftTerm's terminal view. Requiring Command keeps custom mappings
-        // reliable without replacing terminal control sequences such as Ctrl-C.
-        guard NSEvent.ModifierFlags(rawValue: modifiers).contains(.command) else { return nil }
+        guard NSEvent.ModifierFlags(rawValue: modifiers).contains(.command) ||
+              NSEvent.ModifierFlags(rawValue: modifiers).contains(.function) ||
+              event.keyCode == 116 || event.keyCode == 121 ||
+              event.keyCode == 115 || event.keyCode == 119 else { return nil }
         return TerminalKeyBinding(
             keyCode: event.keyCode,
             modifiers: NSEvent.ModifierFlags(rawValue: modifiers)
@@ -107,7 +190,24 @@ struct TerminalKeyBinding: Hashable {
     }
 
     func matches(_ event: NSEvent) -> Bool {
-        keyCode == event.keyCode && modifiersRawValue == Self.normalizedModifiers(event.modifierFlags)
+        let eventMods = Self.normalizedModifiers(event.modifierFlags)
+        if keyCode == event.keyCode && modifiersRawValue == eventMods {
+            return true
+        }
+        // Match PageUp (116) / PageDown (121) / Home (115) / End (119) across Apple keyboard Fn variations
+        if keyCode == 116 && (event.keyCode == 116 || (event.keyCode == 126 && eventMods == Self.normalizedModifiers([.function]))) {
+            return true
+        }
+        if keyCode == 121 && (event.keyCode == 121 || (event.keyCode == 125 && eventMods == Self.normalizedModifiers([.function]))) {
+            return true
+        }
+        if keyCode == 115 && (event.keyCode == 115 || (event.keyCode == 123 && eventMods == Self.normalizedModifiers([.function]))) {
+            return true
+        }
+        if keyCode == 119 && (event.keyCode == 119 || (event.keyCode == 124 && eventMods == Self.normalizedModifiers([.function]))) {
+            return true
+        }
+        return false
     }
 
     var displayName: String {
@@ -117,7 +217,9 @@ struct TerminalKeyBinding: Hashable {
         if flags.contains(.option) { modifiers += "⌥" }
         if flags.contains(.shift) { modifiers += "⇧" }
         if flags.contains(.command) { modifiers += "⌘" }
-        if flags.contains(.function) { modifiers += "fn" }
+        if flags.contains(.function) && keyCode != 116 && keyCode != 121 && keyCode != 115 && keyCode != 119 {
+            modifiers += "fn "
+        }
         return modifiers + Self.keyName(for: keyCode)
     }
 
@@ -131,10 +233,10 @@ struct TerminalKeyBinding: Hashable {
         case 124: return "→"
         case 125: return "↓"
         case 126: return "↑"
-        case 115: return "↖"
-        case 119: return "↘"
-        case 116: return "⇞"
-        case 121: return "⇟"
+        case 115: return "fn ←"
+        case 119: return "fn →"
+        case 116: return "fn ↑"
+        case 121: return "fn ↓"
         case 36: return "↩"
         case 48: return "⇥"
         case 51: return "⌫"
