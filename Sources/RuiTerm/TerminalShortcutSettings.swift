@@ -93,7 +93,7 @@ enum TerminalShortcutAction: String, CaseIterable, Identifiable {
     }
 
     fileprivate var storageKey: String {
-        "terminalShortcut.v4.\(rawValue)"
+        "terminalShortcut.v5.\(rawValue)"
     }
 
     fileprivate var defaultBinding: TerminalKeyBinding {
@@ -107,9 +107,9 @@ enum TerminalShortcutAction: String, CaseIterable, Identifiable {
         case .wordRight:
             return TerminalKeyBinding(keyCode: 124, modifiers: [.option]) // ⌥→
         case .pageUp:
-            return TerminalKeyBinding(keyCode: 116, modifiers: [.function]) // fn ↑ (Page Up)
+            return TerminalKeyBinding(keyCode: 116, modifiers: []) // Page Up
         case .pageDown:
-            return TerminalKeyBinding(keyCode: 121, modifiers: [.function]) // fn ↓ (Page Down)
+            return TerminalKeyBinding(keyCode: 121, modifiers: []) // Page Down
         case .scrollToTop:
             return TerminalKeyBinding(keyCode: 126, modifiers: [.command]) // ⌘↑
         case .scrollToBottom:
@@ -153,7 +153,7 @@ struct TerminalKeyBinding: Hashable {
     private let modifiersRawValue: UInt
 
     private static let supportedModifiers: NSEvent.ModifierFlags = [
-        .command, .option, .control, .shift, .function
+        .command, .option, .control, .shift
     ]
 
     init(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
@@ -165,8 +165,7 @@ struct TerminalKeyBinding: Hashable {
         let parts = serializedValue.split(separator: ":", maxSplits: 1)
         guard parts.count == 2,
               let keyCode = UInt16(parts[0]),
-              let modifiers = UInt(parts[1]),
-              modifiers != 0 else {
+              let modifiers = UInt(parts[1]) else {
             return nil
         }
         self.keyCode = keyCode
@@ -175,13 +174,15 @@ struct TerminalKeyBinding: Hashable {
 
     static func capture(from event: NSEvent) -> TerminalKeyBinding? {
         let modifiers = normalizedModifiers(event.modifierFlags)
-        guard NSEvent.ModifierFlags(rawValue: modifiers).contains(.command) ||
-              NSEvent.ModifierFlags(rawValue: modifiers).contains(.function) ||
-              event.keyCode == 116 || event.keyCode == 121 ||
-              event.keyCode == 115 || event.keyCode == 119 else { return nil }
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        let isSpecialNavKey = event.keyCode == 116 || event.keyCode == 121 ||
+                              event.keyCode == 115 || event.keyCode == 119
+        guard flags.contains(.command) || flags.contains(.option) || flags.contains(.control) || isSpecialNavKey else {
+            return nil
+        }
         return TerminalKeyBinding(
             keyCode: event.keyCode,
-            modifiers: NSEvent.ModifierFlags(rawValue: modifiers)
+            modifiers: flags
         )
     }
 
@@ -191,23 +192,7 @@ struct TerminalKeyBinding: Hashable {
 
     func matches(_ event: NSEvent) -> Bool {
         let eventMods = Self.normalizedModifiers(event.modifierFlags)
-        if keyCode == event.keyCode && modifiersRawValue == eventMods {
-            return true
-        }
-        // Match PageUp (116) / PageDown (121) / Home (115) / End (119) across Apple keyboard Fn variations
-        if keyCode == 116 && (event.keyCode == 116 || (event.keyCode == 126 && eventMods == Self.normalizedModifiers([.function]))) {
-            return true
-        }
-        if keyCode == 121 && (event.keyCode == 121 || (event.keyCode == 125 && eventMods == Self.normalizedModifiers([.function]))) {
-            return true
-        }
-        if keyCode == 115 && (event.keyCode == 115 || (event.keyCode == 123 && eventMods == Self.normalizedModifiers([.function]))) {
-            return true
-        }
-        if keyCode == 119 && (event.keyCode == 119 || (event.keyCode == 124 && eventMods == Self.normalizedModifiers([.function]))) {
-            return true
-        }
-        return false
+        return keyCode == event.keyCode && modifiersRawValue == eventMods
     }
 
     var displayName: String {
@@ -217,9 +202,6 @@ struct TerminalKeyBinding: Hashable {
         if flags.contains(.option) { modifiers += "⌥" }
         if flags.contains(.shift) { modifiers += "⇧" }
         if flags.contains(.command) { modifiers += "⌘" }
-        if flags.contains(.function) && keyCode != 116 && keyCode != 121 && keyCode != 115 && keyCode != 119 {
-            modifiers += "fn "
-        }
         return modifiers + Self.keyName(for: keyCode)
     }
 
@@ -233,10 +215,10 @@ struct TerminalKeyBinding: Hashable {
         case 124: return "→"
         case 125: return "↓"
         case 126: return "↑"
-        case 115: return "fn ←"
-        case 119: return "fn →"
-        case 116: return "fn ↑"
-        case 121: return "fn ↓"
+        case 115: return "Home"
+        case 119: return "End"
+        case 116: return "Page Up"
+        case 121: return "Page Down"
         case 36: return "↩"
         case 48: return "⇥"
         case 51: return "⌫"

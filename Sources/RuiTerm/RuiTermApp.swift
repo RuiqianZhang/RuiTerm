@@ -141,13 +141,13 @@ struct RuiTermApp: App {
                 Button("滚动到顶部") {
                     terminalCommands.scrollToTop()
                 }
-                .keyboardShortcut(.upArrow)
+                .keyboardShortcut(.upArrow, modifiers: .command)
                 .disabled(!terminalCommands.isKeyResponder)
 
                 Button("滚动到底部") {
                     terminalCommands.scrollToBottom()
                 }
-                .keyboardShortcut(.downArrow)
+                .keyboardShortcut(.downArrow, modifiers: .command)
                 .disabled(!terminalCommands.isKeyResponder)
 
                 Divider()
