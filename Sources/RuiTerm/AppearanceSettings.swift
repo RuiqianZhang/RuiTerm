@@ -100,7 +100,7 @@ enum TerminalThemePreset: String, CaseIterable, Identifiable {
     
     var cursor: String {
         switch self {
-        case .ruiTerm: return "#FFFFFF"
+        case .ruiTerm: return "#FF9F0A"
         case .homebrew: return "#26E326"
         case .solarizedDark: return "#93A1A1"
         case .solarizedLight: return "#657B83"
@@ -144,6 +144,9 @@ final class AppearanceSettings: ObservableObject {
 
     private init() {
         scrollbackLines = Self.clampedScrollbackLines(scrollbackLines)
+        if cursorHex == "#FFFFFF" {
+            cursorHex = TerminalThemePreset.ruiTerm.cursor
+        }
     }
 
     static func clampedScrollbackLines(_ lines: Int) -> Int {
