@@ -958,6 +958,14 @@ final class RuiTermTerminalView: SwiftTerm.TerminalView, @preconcurrency SwiftTe
 
     override func keyDown(with event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if flags.contains(.command) {
+            if handleConfiguredShortcut(event) {
+                return
+            }
+            if handleTerminalCommand(event) {
+                return
+            }
+        }
         if flags == .option {
             switch event.keyCode {
             case 123: // Option + Left
@@ -1041,29 +1049,53 @@ final class RuiTermTerminalView: SwiftTerm.TerminalView, @preconcurrency SwiftTe
     }
 
     func moveToBeginningOfLine() {
-        // Route through SwiftTerm so it picks the correct normal/application
-        // cursor sequence for shells and full-screen terminal programs.
-        doCommand(by: #selector(NSResponder.moveToBeginningOfLine(_:)))
+        if getTerminal().isCurrentBufferAlternate {
+            sendData?(Data(getTerminal().applicationCursor ? EscapeSequences.moveHomeApp : EscapeSequences.moveHomeNormal))
+        } else {
+            sendData?(Data([0x01])) // \x01 (Ctrl-A in shell/readline)
+        }
     }
 
     func moveToEndOfLine() {
-        doCommand(by: #selector(NSResponder.moveToEndOfLine(_:)))
+        if getTerminal().isCurrentBufferAlternate {
+            sendData?(Data(getTerminal().applicationCursor ? EscapeSequences.moveEndApp : EscapeSequences.moveEndNormal))
+        } else {
+            sendData?(Data([0x05])) // \x05 (Ctrl-E in shell/readline)
+        }
     }
 
     func scrollPageUp() {
-        pageUp()
+        if getTerminal().isCurrentBufferAlternate {
+            sendData?(Data(EscapeSequences.cmdPageUp))
+        } else {
+            pageUp()
+        }
     }
 
     func scrollPageDown() {
-        pageDown()
+        if getTerminal().isCurrentBufferAlternate {
+            sendData?(Data(EscapeSequences.cmdPageDown))
+        } else {
+            pageDown()
+        }
     }
 
     func scrollToTop() {
-        scroll(toPosition: 0)
+        if getTerminal().isCurrentBufferAlternate {
+            // In vi / vim: Ctrl-Home (\e[1;5H) jumps to top of document (line 1)
+            sendData?(Data([0x1B, 0x5B, 0x31, 0x3B, 0x35, 0x48]))
+        } else {
+            scroll(toPosition: 0)
+        }
     }
 
     func scrollToBottom() {
-        scroll(toPosition: 1)
+        if getTerminal().isCurrentBufferAlternate {
+            // In vi / vim: Ctrl-End (\e[1;5F) jumps to bottom of document (last line)
+            sendData?(Data([0x1B, 0x5B, 0x31, 0x3B, 0x35, 0x46]))
+        } else {
+            scroll(toPosition: 1)
+        }
     }
 
     func increaseFontSize() {
@@ -1173,12 +1205,6 @@ final class RuiTermTerminalView: SwiftTerm.TerminalView, @preconcurrency SwiftTe
         case 29, 82:
             resetTerminalFontSize()
             return true
-        case 115, 126:
-            scrollToTop()
-            return true
-        case 119, 125:
-            scrollToBottom()
-            return true
         default:
             break
         }
@@ -1213,6 +1239,18 @@ final class RuiTermTerminalView: SwiftTerm.TerminalView, @preconcurrency SwiftTe
             moveToBeginningOfLine()
         case .endOfLine:
             moveToEndOfLine()
+        case .wordLeft:
+            if getTerminal().isCurrentBufferAlternate {
+                sendData?(Data(EscapeSequences.emacsBack))
+            } else {
+                sendData?(Data([0x1B, 0x62]))
+            }
+        case .wordRight:
+            if getTerminal().isCurrentBufferAlternate {
+                sendData?(Data(EscapeSequences.emacsForward))
+            } else {
+                sendData?(Data([0x1B, 0x66]))
+            }
         case .pageUp:
             scrollPageUp()
         case .pageDown:
@@ -1221,6 +1259,18 @@ final class RuiTermTerminalView: SwiftTerm.TerminalView, @preconcurrency SwiftTe
             scrollToTop()
         case .scrollToBottom:
             scrollToBottom()
+        case .deleteToBeginningOfLine:
+            sendData?(Data([0x15])) // Ctrl-U
+        case .deleteWordBackward:
+            sendData?(Data([0x1B, 0x7F])) // Esc + Delete
+        case .clearScreen:
+            clearTerminal()
+        case .increaseFontSize:
+            increaseFontSize()
+        case .decreaseFontSize:
+            decreaseFontSize()
+        case .resetFontSize:
+            resetTerminalFontSize()
         case .newTab:
             delegateOnNewTab?()
         case .splitRight:
@@ -1229,6 +1279,14 @@ final class RuiTermTerminalView: SwiftTerm.TerminalView, @preconcurrency SwiftTe
             delegateOnSplitDown?()
         case .closePane:
             delegateOnClose?()
+        case .copy:
+            copySelection()
+        case .paste:
+            pasteClipboard()
+        case .selectAll:
+            selectAllContent()
+        case .find:
+            showFind()
         }
         return true
     }

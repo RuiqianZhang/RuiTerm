@@ -1374,10 +1374,9 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
                 send (EscapeSequences.cmdPageDown)
             }
         case #selector(moveToLeftEndOfLine(_:)):
-            // Apple sends the Emacs back-word commands
-            send (EscapeSequences.emacsBack)
+            send (terminal.applicationCursor ? EscapeSequences.moveHomeApp : EscapeSequences.moveHomeNormal)
         case #selector(moveToRightEndOfLine(_:)):
-            send (EscapeSequences.emacsForward)
+            send (terminal.applicationCursor ? EscapeSequences.moveEndApp : EscapeSequences.moveEndNormal)
         default:
             print ("Unhandle selector \(selector)")
         }
@@ -2129,6 +2128,10 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
         ])
         findBar = bar
         return bar
+    }
+
+    public func showFind() {
+        showFindBar(prefillSelection: true)
     }
 
     private func showFindBar(prefillSelection: Bool) {
